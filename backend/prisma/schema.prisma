@@ -1,0 +1,187 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+model User {
+  id                String    @id @default(cuid())
+  username          String    @unique
+  email             String    @unique
+  password          String
+  avatarUrl         String?
+  bio               String    @default("")
+  level             Int       @default(1)
+  totalStudySeconds Int       @default(0)
+  currentStreak     Int       @default(0)
+  longestStreak     Int       @default(0)
+  lastStudyDate     DateTime?
+  lastActive        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions      StudySession[]
+  roomMembers   RoomMember[]
+  activities    Activity[]
+  encouragements Encouragement[]
+  comments      Comment[]
+  achievements  UserAchievement[]
+
+  @@index([username])
+  @@index([email])
+}
+
+// ── Study Sessions ────────────────────────────────────────────────────────────
+model StudySession {
+  id                String        @id @default(cuid())
+  userId            String
+  roomId            String?
+  subject           String
+  memo              String        @default("")
+  startTime         DateTime
+  endTime           DateTime?
+  durationSeconds   Int           @default(0)
+  pausedSeconds     Int           @default(0)
+  distractionCount  Int           @default(0)
+  status            SessionStatus @default(ACTIVE)
+  rating            Int?
+  pausedAt          DateTime?
+  createdAt         DateTime      @default(now())
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room   StudyRoom?  @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startTime(sort: Desc)])
+  @@index([roomId, startTime(sort: Desc)])
+  @@index([status, userId])
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+// ── Study Rooms ───────────────────────────────────────────────────────────────
+model StudyRoom {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  isPrivate   Boolean  @default(false)
+  password    String?
+  maxMembers  Int      @default(20)
+  createdById String
+  tags        String[] @default([])
+  inviteCode  String?  @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members  RoomMember[]
+  sessions StudySession[]
+  activities Activity[]
+
+  @@index([isPrivate, isActive])
+  @@index([name])
+}
+
+model RoomMember {
+  roomId    String
+  userId    String
+  role      MemberRole @default(MEMBER)
+  joinedAt  DateTime   @default(now())
+
+  room StudyRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, userId])
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ── Activity Feed ─────────────────────────────────────────────────────────────
+model Activity {
+  id                 String       @id @default(cuid())
+  userId             String
+  roomId             String?
+  type               ActivityType
+  data               Json         @default("{}")
+  encouragementCount Int          @default(0)
+  commentCount       Int          @default(0)
+  createdAt          DateTime     @default(now())
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room          StudyRoom?      @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  encouragements Encouragement[]
+  comments      Comment[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([roomId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+}
+
+enum ActivityType {
+  SESSION_START
+  SESSION_COMPLETE
+  STREAK_MILESTONE
+  ROOM_JOINED
+  ACHIEVEMENT_EARNED
+  LEVEL_UP
+}
+
+model Encouragement {
+  userId     String
+  activityId String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@id([userId, activityId])
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  userId     String
+  activityId String
+  content    String   @db.VarChar(280)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId, createdAt])
+}
+
+// ── Achievements ──────────────────────────────────────────────────────────────
+model Achievement {
+  id          String @id @default(cuid())
+  key         String @unique   // e.g. "first_light"
+  name        String
+  description String
+  icon        String
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  userId        String
+  achievementId String
+  earnedAt      DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@id([userId, achievementId])
+}
