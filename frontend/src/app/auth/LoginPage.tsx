@@ -42,7 +42,7 @@ export function LoginPage() {
           </p>
         </div>
         <span className="font-mono text-[10px] text-gray-800 tracking-[0.2em] uppercase">
-          Free. Local. No Docker.
+          Free.
         </span>
       </div>
       <div className="flex-1 flex items-center justify-center p-8">
